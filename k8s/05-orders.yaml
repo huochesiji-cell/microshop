@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders
+  namespace: microshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders
+  template:
+    metadata:
+      labels:
+        app: orders
+    spec:
+      containers:
+      - name: orders
+        image: 192.168.182.166/library/orders:1.0
+        ports:
+        - containerPort: 5000
+        env:                          # 配置从 ConfigMap/Secret 注入，代码里 os.environ 读取
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef: {name: app-config, key: DB_HOST}
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef: {name: app-config, key: DB_PORT}
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef: {name: app-config, key: DB_NAME}
+        - name: DB_USER
+          valueFrom:
+            configMapKeyRef: {name: app-config, key: DB_USER}
+        - name: DB_PASSWORD               # 密码走 Secret，不进 ConfigMap
+          valueFrom:
+            secretKeyRef: {name: mysql-secret, key: MYSQL_ROOT_PASSWORD}
+        readinessProbe:
+          httpGet: {path: /healthz, port: 5000}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet: {path: /healthz, port: 5000}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests: {memory: "64Mi", cpu: "100m"}
+          limits:   {memory: "256Mi", cpu: "500m"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders
+  namespace: microshop
+spec:
+  selector:
+    app: orders
+  ports:
+  - port: 5000
+    targetPort: 5000

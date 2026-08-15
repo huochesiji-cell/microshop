@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: microshop-ingress
+  namespace: microshop
+spec:
+  ingressClassName: nginx          # 用之前部署的 ingress-nginx
+  rules:
+  - http:
+      paths:
+      - path: /api/orders          # 订单 API 路由到 orders 服务
+        pathType: Prefix
+        backend:
+          service: {name: orders, port: {number: 5000}}
+      - path: /api/users           # 用户 API 路由到 users 服务
+        pathType: Prefix
+        backend:
+          service: {name: users, port: {number: 5000}}
+      - path: /                    # 其他所有路径 → 前端
+        pathType: Prefix
+        backend:
+          service: {name: frontend, port: {number: 80}}

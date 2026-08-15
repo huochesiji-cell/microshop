@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users
+  namespace: microshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: users
+  template:
+    metadata:
+      labels:
+        app: users
+    spec:
+      containers:
+      - name: users
+        image: 192.168.182.166/library/users:1.0
+        ports:
+        - containerPort: 5000
+        env:
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef: {name: app-config, key: REDIS_HOST}
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef: {name: app-config, key: REDIS_PORT}
+        readinessProbe:
+          httpGet: {path: /healthz, port: 5000}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet: {path: /healthz, port: 5000}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests: {memory: "64Mi", cpu: "100m"}
+          limits:   {memory: "256Mi", cpu: "500m"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: users
+  namespace: microshop
+spec:
+  selector:
+    app: users
+  ports:
+  - port: 5000
+    targetPort: 5000

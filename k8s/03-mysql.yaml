@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: microshop
+spec:
+  storageClassName: nfs-client       # 用 Day 3 上午建的 NFS 动态供应
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: microshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: 192.168.182.166/library/mysql:5.7
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:            # 密码从 Secret 注入，不写死在 YAML
+              name: mysql-secret
+              key: MYSQL_ROOT_PASSWORD
+        args:                        # 针对 NFS 存储的特殊参数
+          - --character-set-server=utf8mb4
+          - --collation-server=utf8mb4_unicode_ci
+          - --innodb_flush_method=fsync      # NFS 不支持 O_DIRECT，改 fsync
+          - --innodb_use_native_aio=0        # NFS 不支持原生 AIO，关掉
+        readinessProbe:              # 就绪探针：能 ping 通才算就绪
+          exec:
+            command: ["sh", "-c", "mysqladmin ping -h127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql        # 数据目录持久化到 NFS
+        - name: init
+          mountPath: /docker-entrypoint-initdb.d   # 首次启动自动执行 init.sql
+        resources:
+          requests: {memory: "256Mi", cpu: "250m"}
+          limits:   {memory: "512Mi", cpu: "1"}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+      - name: init
+        configMap:
+          name: mysql-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: microshop
+spec:
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+    targetPort: 3306

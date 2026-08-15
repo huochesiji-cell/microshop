@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>微服务商城</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: #fff; padding: 20px; margin: 15px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin-top: 0; color: #555; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛒 微服务商城</h1>
+        <p>前端通过 Ingress 调用后端微服务 API（验证微服务互通）</p>
+
+        <div class="card">
+            <h2>📦 商品列表（前端静态数据）</h2>
+            <ul>
+                <li>iPhone 15 Pro — ¥7999</li>
+                <li>MacBook Air — ¥9499</li>
+                <li>AirPods Pro — ¥1899</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>👥 用户服务（Python + Redis 缓存）</h2>
+            <div id="users">加载中...</div>
+        </div>
+
+        <div class="card">
+            <h2>📋 订单服务（Python + MySQL 持久化）</h2>
+            <div id="orders">加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        // 调用用户服务（后端 /api/users，数据来自 Redis）
+        fetch('/api/users')
+            .then(r => r.json())
+            .then(d => {
+                if (d.code === 0) {
+                    let html = '<table><tr><th>ID</th><th>姓名</th></tr>';
+                    d.data.forEach(u => html += `<tr><td>${u.id}</td><td>${u.name}</td></tr>`);
+                    html += '</table>';
+                    html += `<p>Redis 访问计数：<b>${d.visit_count}</b>（每次刷新 +1，证明缓存生效）</p>`;
+                    document.getElementById('users').innerHTML = html;
+                } else {
+                    document.getElementById('users').innerHTML = `<span class="error">错误：${d.error}</span>`;
+                }
+            })
+            .catch(e => document.getElementById('users').innerHTML = `<span class="error">请求失败：${e}</span>`);
+
+        // 调用订单服务（后端 /api/orders，数据来自 MySQL）
+        fetch('/api/orders')
+            .then(r => r.json())
+            .then(d => {
+                if (d.code === 0) {
+                    if (d.data.length === 0) {
+                        document.getElementById('orders').innerHTML = '暂无订单';
+                        return;
+                    }
+                    let html = '<table><tr><th>ID</th><th>商品</th><th>数量</th><th>时间</th></tr>';
+                    d.data.forEach(o => html += `<tr><td>${o.id}</td><td>${o.product}</td><td>${o.quantity}</td><td>${o.created_at}</td></tr>`);
+                    html += '</table>';
+                    document.getElementById('orders').innerHTML = html;
+                } else {
+                    document.getElementById('orders').innerHTML = `<span class="error">错误：${d.error}</span>`;
+                }
+            })
+            .catch(e => document.getElementById('orders').innerHTML = `<span class="error">请求失败：${e}</span>`);
+    </script>
+</body>
+</html>
