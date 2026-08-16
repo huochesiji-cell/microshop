@@ -2,21 +2,20 @@ name: Build and Deploy Microshop
 
 on:
   push:
-    branches: [main]        # 推送到 main 分支就触发
+    branches: [main]
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted    # 跑在你的自托管 runner 上（内网）
+    runs-on: self-hosted
     steps:
-      # 1. 拉取代码（自动用 GITHUB_TOKEN 克隆私有仓库）
-      - name: Checkout code
-        uses: actions/checkout@v3
+      # 不用 actions/checkout（JS action 需要 Node），改用原生 git clone
+      - name: Checkout code (native git)
+        run: |
+          git clone --depth 1 https://x-access-token:${{ github.token }}@github.com/huochesiji-cell/microshop.git .
 
-      # 2. 登录 Harbor（密码从 Secret 读取，不硬编码）
       - name: Login to Harbor
         run: echo "${{ secrets.HARBOR_PASSWORD }}" | docker login 192.168.182.166 -u admin --password-stdin
 
-      # 3. 构建 + 推送 3 个镜像（tag 用 commit SHA，不可变、可追溯）
       - name: Build and push images
         run: |
           docker build -t 192.168.182.166/library/frontend:${{ github.sha }} frontend/
@@ -26,7 +25,6 @@ jobs:
           docker build -t 192.168.182.166/library/users:${{ github.sha }} users/
           docker push 192.168.182.166/library/users:${{ github.sha }}
 
-      # 4. SSH 到 master 执行滚动更新（kubectl set image 触发 Deployment 滚动更新）
       - name: Deploy to Kubernetes
         run: |
           ssh -o StrictHostKeyChecking=no root@192.168.182.164 "kubectl set image deploy/frontend frontend=192.168.182.166/library/frontend:${{ github.sha }} -n microshop && kubectl set image deploy/orders orders=192.168.182.166/library/orders:${{ github.sha }} -n microshop && kubectl set image deploy/users users=192.168.182.166/library/users:${{ github.sha }} -n microshop"
