@@ -11,7 +11,7 @@ jobs:
       # 不用 actions/checkout（JS action 需要 Node），改用原生 git clone
       - name: Checkout code (native git)
         run: |
-          rm -rf ./* 2>/dev/null || true   # 先清空上次运行残留的文件
+          rm -rf ./* .[!.]* 2>/dev/null || true   # .[!.]* 连隐藏文件(.git)一起删
           git clone --depth 1 https://x-access-token:${{ github.token }}@github.com/huochesiji-cell/microshop.git .
 
       - name: Login to Harbor
